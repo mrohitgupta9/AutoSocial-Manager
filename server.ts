@@ -31,6 +31,13 @@ async function startServer() {
     fs.mkdirSync(generatedPath, { recursive: true });
   }
   app.use("/generated", express.static(generatedPath));
+  
+  // Serve logos
+  const logosPath = path.join(process.cwd(), "data", "logos");
+  if (!fs.existsSync(logosPath)) {
+    fs.mkdirSync(logosPath, { recursive: true });
+  }
+  app.use("/logos", express.static(logosPath));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

@@ -2,43 +2,34 @@ import { Router } from "express";
 import { db } from "./db.ts";
 import { NewsService } from "./services/newsService.ts";
 import { ImageService } from "./services/imageService.ts";
-import { authenticateToken, registerUser, loginUser, AuthRequest } from "./auth.ts";
 import { encrypt, maskToken } from "./utils/crypto.ts";
+import multer from "multer";
+import fs from "fs";
 
 const router = Router();
 
-// --- Auth Routes ---
-router.post("/auth/register", async (req, res) => {
-  const { email, password, name } = req.body;
-  try {
-    const user = await registerUser(email, password, name);
-    res.json(user);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+// --- Multier Setup ---
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = "data/logos";
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = file.originalname.split(".").pop();
+    cb(null, `logo_${Date.now()}.${ext}`);
   }
 });
-
-router.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const result = await loginUser(email, password);
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// --- Protected Routes Middleware ---
-router.use(authenticateToken);
+const upload = multer({ storage });
 
 // --- Credentials Management ---
-router.get("/credentials", (req: AuthRequest, res) => {
-  const credentials = db.prepare("SELECT platform, api_key, api_secret, access_token, status FROM api_credentials WHERE user_id = ?").all(req.user?.id) as any[];
+router.get("/credentials", (req, res) => {
+  const credentials = db.prepare("SELECT platform, api_key, api_secret, access_token, status FROM api_credentials").all() as any[];
   
   // Mask sensitive information before sending to client
   const maskedCredentials = credentials.map(c => ({
     ...c,
-    api_key: c.api_key ? maskToken("EXISTS") : null, // Just indicate existence
+    api_key: c.api_key ? maskToken("EXISTS") : null,
     api_secret: c.api_secret ? maskToken("EXISTS") : null,
     access_token: c.access_token ? maskToken("EXISTS") : null,
     isSet: true
@@ -47,9 +38,8 @@ router.get("/credentials", (req: AuthRequest, res) => {
   res.json(maskedCredentials);
 });
 
-router.post("/credentials", (req: AuthRequest, res) => {
+router.post("/credentials", (req, res) => {
   const { platform, api_key, api_secret, access_token } = req.body;
-  const id = crypto.randomUUID();
   
   try {
     // Encrypt keys before storing
@@ -58,9 +48,9 @@ router.post("/credentials", (req: AuthRequest, res) => {
     const encryptedToken = access_token ? encrypt(access_token) : null;
 
     db.prepare(`
-      INSERT OR REPLACE INTO api_credentials (id, user_id, platform, api_key, api_secret, access_token)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, req.user?.id, platform, encryptedKey, encryptedSecret, encryptedToken);
+      INSERT OR REPLACE INTO api_credentials (platform, api_key, api_secret, access_token)
+      VALUES (?, ?, ?, ?)
+    `).run(platform, encryptedKey, encryptedSecret, encryptedToken);
     
     res.json({ success: true });
   } catch (err: any) {
@@ -102,10 +92,15 @@ router.post("/posts/generate", async (req, res) => {
   if (!topic) return res.status(404).json({ error: "Topic not found" });
 
   try {
-    // 1. Image generation (Backend handles this as it uses sharp)
+    const branding = db.prepare("SELECT logo_path, branding_theme FROM branding_settings WHERE id = 1").get() as any;
+    
+    // 1. Image generation
     const imageFilename = `post_${Date.now()}.png`;
     const imagePath = `data/generated/${imageFilename}`;
-    await ImageService.createSocialImage(topic.title, imagePath);
+    await ImageService.createSocialImage(topic.title, imagePath, {
+      logoPath: branding?.logo_path,
+      theme: branding?.branding_theme
+    });
 
     const postId = crypto.randomUUID();
     db.prepare(`
@@ -124,6 +119,58 @@ router.post("/posts/:id/schedule", (req, res) => {
   const { scheduled_at } = req.body;
   db.prepare("UPDATE posts SET scheduled_at = ?, status = 'scheduled' WHERE id = ?").run(scheduled_at, id);
   res.json({ success: true });
+});
+
+router.patch("/posts/:id", (req, res) => {
+  const { id } = req.params;
+  const { content, hashtags } = req.body;
+  
+  try {
+    db.prepare("UPDATE posts SET content = ?, hashtags = ? WHERE id = ? AND status = 'draft'")
+      .run(content, hashtags, id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// --- User Branding ---
+router.get("/user/branding", (req, res) => {
+  const branding = db.prepare("SELECT logo_path, branding_theme FROM branding_settings WHERE id = 1").get() as any;
+  res.json(branding);
+});
+
+router.patch("/user/branding", (req, res) => {
+  const { branding_theme } = req.body;
+  try {
+    db.prepare("UPDATE branding_settings SET branding_theme = ? WHERE id = 1").run(branding_theme);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/user/logo", upload.single("logo"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  
+  const logoPath = `/logos/${req.file.filename}`;
+  try {
+    db.prepare("UPDATE branding_settings SET logo_path = ? WHERE id = 1").run(logoPath);
+    res.json({ success: true, logoPath });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/posts/:id", (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare("DELETE FROM posts WHERE id = ?").run(id);
+    db.prepare("DELETE FROM analytics WHERE post_id = ?").run(id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
 });
 
 // Analytics API

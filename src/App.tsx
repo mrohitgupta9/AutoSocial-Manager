@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, Plus, Calendar, CheckCircle, RefreshCcw, Send, BarChart3, Image as ImageIcon, History } from "lucide-react";
+import { TrendingUp, Plus, Calendar, CheckCircle, RefreshCcw, Send, BarChart3, Image as ImageIcon, History, Trash2 } from "lucide-react";
 import { ApiService } from "./services/apiService";
 import { GeminiService } from "./services/geminiService";
 import { motion, AnimatePresence } from "motion/react";
@@ -11,86 +11,56 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [isAuthMode, setIsAuthMode] = useState<"login" | "register">("login");
-  const [authForm, setAuthForm] = useState({ email: "", password: "", name: "" });
   const [topics, setTopics] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any[]>([]);
   const [credentials, setCredentials] = useState<any[]>([]);
+  const [branding, setBranding] = useState<any>({ logo_path: null, branding_theme: "modern" });
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"trends" | "posts" | "analytics" | "connections">("trends");
+  const [activeTab, setActiveTab] = useState<"trends" | "posts" | "analytics" | "connections" | "branding">("trends");
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (savedUser) setUser(JSON.parse(savedUser));
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // 30s auto-refresh
+    return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      fetchData();
-      const interval = setInterval(fetchData, 30000); // 30s auto-refresh
-      return () => clearInterval(interval);
-    }
-  }, [user]);
 
   const fetchData = async () => {
     try {
-      const [t, p, a, c] = await Promise.all([
+      const [t, p, a, c, b] = await Promise.all([
         ApiService.getTopics(),
         ApiService.getPosts(),
         ApiService.getAnalytics(),
-        ApiService.getCredentials()
+        ApiService.getCredentials(),
+        ApiService.getBranding()
       ]);
       setTopics(t);
       setPosts(p);
       setAnalytics(a);
       setCredentials(c);
+      setBranding(b);
     } catch (err) {
       console.error(err);
-      if ((err as any).response?.status === 401 || (err as any).response?.status === 403) {
-        handleLogout();
-      }
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRefreshTrends = async () => {
     setLoading(true);
     try {
-      if (isAuthMode === "register") {
-        await ApiService.register(authForm);
-        setIsAuthMode("login");
-      } else {
-        const result = await ApiService.login({ email: authForm.email, password: authForm.password });
-        setUser(result.user);
-      }
+      await ApiService.refreshTopics();
+      await fetchData();
     } catch (err) {
-      const msg = (err as any).response?.data?.error || "Authentication failed";
-      alert(msg);
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    ApiService.logout();
-    setUser(null);
-  };
-
-  // ... (rest of the functions: handleRefreshTrends, handleGeneratePost)
-  const handleRefreshTrends = async () => {
-    setLoading(true);
-    await ApiService.refreshTopics();
-    await fetchData();
-    setLoading(false);
   };
 
   const handleGeneratePost = async (topic: any) => {
     setLoading(true);
     try {
       const content = await GeminiService.generatePostContent(topic.title);
-      await ApiService.generateImage(topic.id, content);
+      await ApiService.generatePost(topic.id, content.caption, content.hashtags.join(" "));
       await fetchData();
       setActiveTab("posts");
     } catch (err) {
@@ -99,75 +69,6 @@ export default function App() {
       setLoading(false);
     }
   };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center p-6">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-10 rounded-3xl shadow-2xl shadow-black/5 w-full max-w-md border border-[#E4E6EB]"
-        >
-          <div className="flex flex-col items-center mb-10">
-            <div className="w-16 h-16 bg-[#FF6321] rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl shadow-orange-500/20">
-              <Send size={32} />
-            </div>
-            <h2 className="text-3xl font-bold tracking-tight text-[#1C1E21]">
-              {isAuthMode === "login" ? "Welcome Back" : "Create Account"}
-            </h2>
-            <p className="text-[#65676B] text-center mt-2">
-              The automated social engine for creators.
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            {isAuthMode === "register" && (
-              <input 
-                type="text" 
-                placeholder="Full Name" 
-                className="w-full px-5 py-3.5 rounded-xl border border-[#E4E6EB] focus:ring-2 focus:ring-[#FF6321] outline-none transition-all"
-                value={authForm.name}
-                onChange={e => setAuthForm({...authForm, name: e.target.value})}
-                required
-              />
-            )}
-            <input 
-              type="email" 
-              placeholder="Email Address" 
-              className="w-full px-5 py-3.5 rounded-xl border border-[#E4E6EB] focus:ring-2 focus:ring-[#FF6321] outline-none transition-all"
-              value={authForm.email}
-              onChange={e => setAuthForm({...authForm, email: e.target.value})}
-              required
-            />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              className="w-full px-5 py-3.5 rounded-xl border border-[#E4E6EB] focus:ring-2 focus:ring-[#FF6321] outline-none transition-all"
-              value={authForm.password}
-              onChange={e => setAuthForm({...authForm, password: e.target.value})}
-              required
-            />
-            <button 
-              disabled={loading}
-              className="w-full bg-[#FF6321] hover:bg-[#FF4E00] text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 mt-4"
-            >
-              {loading ? "Processing..." : isAuthMode === "login" ? "Sign In" : "Register"}
-            </button>
-          </form>
-
-          <p className="text-center mt-8 text-[#65676B] font-medium">
-            {isAuthMode === "login" ? "New around here?" : "Already have an account?"} {" "}
-            <button 
-              onClick={() => setIsAuthMode(isAuthMode === "login" ? "register" : "login")}
-              className="text-[#FF6321] hover:underline font-bold"
-            >
-              {isAuthMode === "login" ? "Join Now" : "Sign In"}
-            </button>
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#1C1E21] font-sans">
@@ -194,6 +95,12 @@ export default function App() {
             label="Content Archive" 
           />
           <NavItem 
+            active={activeTab === "branding"} 
+            onClick={() => setActiveTab("branding")} 
+            icon={<ImageIcon size={20} />} 
+            label="Branding" 
+          />
+          <NavItem 
             active={activeTab === "analytics"} 
             onClick={() => setActiveTab("analytics")} 
             icon={<BarChart3 size={20} />} 
@@ -208,13 +115,6 @@ export default function App() {
         </div>
 
         <div className="mt-auto pt-6 border-t border-[#E4E6EB]">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center font-bold text-[10px]">{user.name?.[0] || user.email[0]}</div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold leading-none">{user.name}</span>
-              <button onClick={handleLogout} className="text-[10px] text-[#65676B] font-bold hover:text-[#FF6321] text-left">Sign Out</button>
-            </div>
-          </div>
           <div className="bg-[#FFF5F0] p-4 rounded-xl border border-[#FFE0D1]">
             <p className="text-[10px] font-bold text-[#FF6321] uppercase tracking-widest mb-1">Status</p>
             <div className="flex items-center gap-2 text-xs font-medium text-[#FF4E00]">
@@ -230,13 +130,15 @@ export default function App() {
         <header className="flex items-center justify-between mb-12">
           <div>
             <h2 className="text-3xl font-bold tracking-tight mb-2">
-              {activeTab === "trends" ? "Trending Now" : activeTab === "posts" ? "Managed Content" : activeTab === "analytics" ? "Performance Hub" : "API Connectivity"}
+              {activeTab === "trends" ? "Trending Now" : activeTab === "posts" ? "Managed Content" : activeTab === "analytics" ? "Performance Hub" : activeTab === "branding" ? "Brand Identity" : "API Connectivity"}
             </h2>
             <p className="text-[#65676B]">
               {activeTab === "trends" 
                 ? "Discovered via global news feeds and social intelligence." 
                 : activeTab === "posts" 
                 ? "Your history of generated, scheduled, and published content."
+                : activeTab === "branding"
+                ? "Customize your logo and visual style for AI-generated posts."
                 : activeTab === "analytics"
                 ? "Real-time engagement metrics for your automated posts."
                 : "Manage your social media platform integrations securely."}
@@ -280,7 +182,7 @@ export default function App() {
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
               {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard key={post.id} post={post} onRefresh={fetchData} />
               ))}
               {posts.length === 0 && <EmptyState label="No content yet. Generate some posts from Trends!" />}
             </motion.div>
@@ -345,6 +247,17 @@ export default function App() {
                 connected={credentials.some(c => c.platform === "Instagram")} 
                 onSave={(data: any) => ApiService.saveCredentials({ platform: "Instagram", ...data }).then(fetchData)}
               />
+            </motion.div>
+          )}
+
+          {activeTab === "branding" && (
+            <motion.div 
+              key="branding"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <BrandingView branding={branding} onRefresh={fetchData} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -465,9 +378,61 @@ function TopicCard({ topic, onGenerate, loading }: any) {
   );
 }
 
-function PostCard({ post }: any) {
+function PostCard({ post, onRefresh }: any) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(post.content);
+  const [editedHashtags, setEditedHashtags] = useState(post.hashtags);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this post? This cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      await ApiService.deletePost(post.id);
+      onRefresh();
+    } catch (err) {
+      console.error("Deletion failed", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSchedule = async () => {
+    if (!scheduleTime) return;
+    setIsScheduling(true);
+    try {
+      const isoString = new Date(scheduleTime).toISOString();
+      await ApiService.schedulePost(post.id, isoString);
+      onRefresh();
+    } catch (err) {
+      console.error("Scheduling failed", err);
+    } finally {
+      setIsScheduling(false);
+      setShowPicker(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    setIsSaving(true);
+    try {
+      await ApiService.updatePost(post.id, { content: editedContent, hashtags: editedHashtags });
+      setIsEditing(false);
+      onRefresh();
+    } catch (err) {
+      console.error("Update failed", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E4E6EB] overflow-hidden flex flex-col hover:shadow-xl transition-all">
+    <>
+    <div className="bg-white rounded-2xl border border-[#E4E6EB] overflow-hidden flex flex-col hover:shadow-xl transition-all h-full">
       <div className="aspect-square bg-gray-100 relative overflow-hidden bg-gradient-to-br from-[#FF6321] to-[#FF4E00]">
         <img 
           src={post.image_path} 
@@ -478,10 +443,41 @@ function PostCard({ post }: any) {
         <div className="absolute top-4 right-4 flex gap-2">
            <span className={cn(
              "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-sm",
-             post.status === 'posted' ? "bg-green-500 text-white" : "bg-blue-500 text-white"
+             post.status === 'posted' ? "bg-green-500 text-white" : 
+             post.status === 'scheduled' ? "bg-blue-500 text-white" : "bg-gray-500 text-white"
            )}>
             {post.status}
           </span>
+          {(!isEditing) && (
+            <div className="flex gap-1">
+              {post.status === 'draft' && (
+                <button 
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="bg-white/90 hover:bg-white text-[#1C1E21] p-1.5 rounded-lg shadow-sm transition-colors"
+                  title="Preview Post"
+                >
+                  <Send size={14} />
+                </button>
+              )}
+              {post.status === 'draft' && (
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="bg-white/90 hover:bg-white text-[#1C1E21] p-1.5 rounded-lg shadow-sm transition-colors"
+                  title="Edit Post"
+                >
+                  <Plus size={14} className="rotate-45" />
+                </button>
+              )}
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-white/90 hover:bg-red-50 text-[#1C1E21] hover:text-red-600 p-1.5 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                title="Delete Post"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className="p-6 flex flex-col flex-grow">
@@ -489,23 +485,423 @@ function PostCard({ post }: any) {
           <span className="text-[10px] font-medium text-[#65676B] uppercase tracking-widest px-2 py-0.5 rounded border border-[#E4E6EB]">Twitter</span>
            <span className="text-[10px] font-medium text-[#65676B] uppercase tracking-widest px-2 py-0.5 rounded border border-[#E4E6EB]">Instagram</span>
         </div>
-        <p className="text-sm line-clamp-3 mb-4 leading-relaxed font-medium">
-          {post.content}
-        </p>
-        <div className="text-[10px] font-bold text-[#FF6321] mb-6">
-          {post.hashtags}
-        </div>
-        <div className="mt-auto pt-4 border-t border-[#F0F2F5] flex items-center justify-between text-[#8A8D91] text-xs font-semibold">
-           <div className="flex items-center gap-1.5">
-             <Calendar size={14} />
-             {post.posted_at ? new Date(post.posted_at).toLocaleDateString() : 'Scheduled'}
-           </div>
-           {post.status === 'draft' && (
-             <button className="text-[#FF6321] hover:underline">Schedule</button>
+
+        {isEditing ? (
+          <div className="flex flex-col gap-3 mb-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative group">
+              <textarea
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl border-2 border-[#FF6321] text-sm focus:ring-4 focus:ring-[#FF6321]/10 outline-none min-h-[120px] resize-none shadow-sm transition-all"
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
+                placeholder="Write your caption here..."
+              />
+              <div className="absolute bottom-2 right-2 text-[10px] font-bold text-[#8A8D91] bg-white/80 px-2 py-1 rounded">
+                Caption
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full px-4 py-3 rounded-xl border-2 border-[#E4E6EB] focus:border-[#FF6321] text-xs font-bold text-[#FF6321] focus:ring-4 focus:ring-[#FF6321]/10 outline-none transition-all"
+                value={editedHashtags}
+                onChange={(e) => setEditedHashtags(e.target.value)}
+                placeholder="#hashtags"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[#8A8D91]">
+                Hashtags
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={handleUpdate}
+                disabled={isSaving}
+                className="flex-grow bg-[#FF6321] hover:bg-[#FF4E00] text-white py-3 rounded-xl font-bold text-xs shadow-lg shadow-[#FF6321]/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </button>
+              <button 
+                onClick={() => { setIsEditing(false); setEditedContent(post.content); setEditedHashtags(post.hashtags); }}
+                className="px-6 py-3 bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#65676B] rounded-xl font-bold text-xs transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => post.status === 'draft' && setIsEditing(true)}
+            className={cn(
+              "group cursor-pointer relative",
+              post.status === 'draft' && "hover:bg-gray-50 -mx-2 px-2 py-2 rounded-xl transition-colors"
+            )}
+          >
+            <p className="text-sm line-clamp-3 mb-4 leading-relaxed font-medium">
+              {post.content}
+            </p>
+            <div className="text-[10px] font-bold text-[#FF6321] mb-6">
+              {post.hashtags}
+            </div>
+            {post.status === 'draft' && (
+              <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#FF6321] text-white text-[9px] font-black uppercase px-2 py-1 rounded-bl-lg rounded-tr-xl">
+                Click to Edit
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="mt-auto pt-4 border-t border-[#F0F2F5]">
+           {post.status === 'draft' ? (
+             <div className="space-y-3">
+               {!showPicker ? (
+                 <button 
+                  onClick={() => setShowPicker(true)}
+                  className="w-full text-[#FF6321] hover:bg-[#FFF5F0] py-2 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-transparent hover:border-[#FFE0D1]"
+                 >
+                   <Calendar size={14} /> Schedule Post
+                 </button>
+               ) : (
+                 <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+                   <input 
+                     type="datetime-local" 
+                     className="w-full px-3 py-2 rounded-lg border border-[#E4E6EB] text-xs font-semibold focus:ring-2 focus:ring-[#FF6321] outline-none"
+                     value={scheduleTime}
+                     onChange={(e) => setScheduleTime(e.target.value)}
+                   />
+                   <div className="grid grid-cols-2 gap-2">
+                     <button 
+                       onClick={handleSchedule}
+                       disabled={!scheduleTime || isScheduling}
+                       className="bg-[#FF6321] text-white py-2 rounded-lg font-bold text-xs disabled:opacity-50"
+                     >
+                       {isScheduling ? "..." : "Confirm"}
+                     </button>
+                     <button 
+                       onClick={() => setShowPicker(false)}
+                       className="bg-[#F0F2F5] text-[#65676B] py-2 rounded-lg font-bold text-xs"
+                     >
+                       Cancel
+                     </button>
+                   </div>
+                 </div>
+               )}
+             </div>
+           ) : (
+             <div className="flex items-center justify-between text-[#8A8D91] text-xs font-semibold">
+               <div className="flex items-center gap-1.5">
+                 <Calendar size={14} />
+                 {post.posted_at 
+                    ? new Date(post.posted_at).toLocaleDateString() + ' ' + new Date(post.posted_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                    : post.scheduled_at 
+                      ? 'Set for ' + new Date(post.scheduled_at).toLocaleDateString()
+                      : 'Not set'}
+               </div>
+               {post.status === 'posted' && <CheckCircle size={14} className="text-green-500" />}
+             </div>
            )}
         </div>
       </div>
     </div>
+
+    <AnimatePresence>
+      {isPreviewOpen && (
+        <SocialPreviewModal 
+          post={post} 
+          editedContent={editedContent} 
+          editedHashtags={editedHashtags} 
+          onClose={() => setIsPreviewOpen(false)} 
+        />
+      )}
+    </AnimatePresence>
+    </>
+  );
+}
+
+function BrandingView({ branding, onRefresh }: any) {
+  const [loading, setLoading] = useState(false);
+  const themes = [
+    { id: 'modern', name: 'Modern Gradient', desc: 'Vibrant orange and red energy.', colors: 'bg-gradient-to-br from-[#FF6B35] to-[#D00000]' },
+    { id: 'bold', name: 'Bold Pulse', desc: 'High-contrast royal purple and pink.', colors: 'bg-gradient-to-br from-[#6228d7] to-[#ee2a7b]' },
+    { id: 'minimal', name: 'Clean Minimal', desc: 'Sophisticated light gray and dark ink.', colors: 'bg-[#F8F9FA] border border-[#E4E6EB]' },
+    { id: 'brutalist', name: 'Brutalist Yellow', desc: 'Raw, energetic black on yellow.', colors: 'bg-[#FFE000]' },
+  ];
+
+  const handleThemeChange = async (themeId: string) => {
+    setLoading(true);
+    try {
+      await ApiService.updateBranding({ branding_theme: themeId });
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      await ApiService.uploadLogo(file);
+      onRefresh();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+      <div className="space-y-8">
+        <section className="bg-white p-8 rounded-[32px] border border-[#E4E6EB]">
+          <h3 className="text-xl font-bold mb-6">Logo Configuration</h3>
+          <div className="flex items-center gap-8">
+            <div className="w-32 h-32 bg-[#F8F9FA] rounded-[24px] border-2 border-dashed border-[#E4E6EB] flex items-center justify-center overflow-hidden relative group">
+              {branding.logo_path ? (
+                <img src={branding.logo_path} alt="Logo" className="w-full h-full object-contain p-4" />
+              ) : (
+                <ImageIcon size={32} className="text-[#8A8D91]" />
+              )}
+              <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
+                <input type="file" className="hidden" onChange={handleLogoUpload} accept="image/*" />
+                <span className="text-white text-xs font-bold px-3 py-1.5 bg-white/20 rounded-full backdrop-blur-md">Change</span>
+              </label>
+            </div>
+            <div className="flex-grow">
+              <h4 className="font-bold text-sm mb-2">Upload your Brand Logo</h4>
+              <p className="text-xs text-[#65676B] leading-relaxed mb-4">
+                Recommended: Transparent PNG, at least 400x400px. This logo will be overlaid on all your generated content.
+              </p>
+              <label className="inline-flex px-6 py-2.5 bg-[#F0F2F5] hover:bg-[#E4E6EB] rounded-full text-xs font-black cursor-pointer transition-colors">
+                <input type="file" className="hidden" onChange={handleLogoUpload} accept="image/*" />
+                Select File
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white p-8 rounded-[32px] border border-[#E4E6EB]">
+          <h3 className="text-xl font-bold mb-6">Visual Themes</h3>
+          <div className="grid grid-cols-1 gap-4">
+            {themes.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => handleThemeChange(t.id)}
+                disabled={loading}
+                className={cn(
+                  "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left",
+                  branding.branding_theme === t.id ? "border-[#FF6321] bg-[#FFF5F0]" : "border-[#E4E6EB] hover:border-[#8A8D91]"
+                )}
+              >
+                <div className={cn("w-16 h-16 rounded-xl flex-shrink-0 shadow-sm", t.colors)} />
+                <div>
+                  <h4 className="font-bold text-sm flex items-center gap-2">
+                    {t.name}
+                    {branding.branding_theme === t.id && <CheckCircle size={14} className="text-[#FF6321]" />}
+                  </h4>
+                  <p className="text-xs text-[#65676B]">{t.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="lg:sticky lg:top-10 h-fit">
+        <section className="bg-black text-white p-8 rounded-[32px] flex flex-col gap-6">
+          <div>
+            <h3 className="text-xl font-bold mb-2">Live Brand Mockup</h3>
+            <p className="text-[#8A8D91] text-xs font-medium">How your content will look with current settings.</p>
+          </div>
+          
+          <div className={cn(
+            "aspect-square rounded-[24px] w-full relative overflow-hidden flex flex-col items-center justify-center p-12 text-center",
+            branding.branding_theme === 'modern' ? "bg-gradient-to-br from-[#FF6B35] to-[#D00000] text-white" :
+            branding.branding_theme === 'bold' ? "bg-gradient-to-br from-[#6228d7] to-[#ee2a7b] text-white" :
+            branding.branding_theme === 'minimal' ? "bg-white text-black border border-[#E4E6EB]" :
+            "bg-[#FFE000] text-black"
+          )}>
+            {branding.logo_path && (
+              <img src={branding.logo_path} className="w-16 h-16 object-contain absolute top-8" alt="Branding" />
+            )}
+            <h4 className="text-3xl font-black uppercase leading-tight tracking-tight">
+              Sample Heading<br/>for your<br/>Brand
+            </h4>
+            <div className="absolute bottom-8 font-black text-[10px] tracking-widest opacity-60 uppercase">
+              AutoSocial | Brand Sample
+            </div>
+          </div>
+
+          <div className="bg-white/10 p-4 rounded-2xl border border-white/10">
+            <p className="text-[10px] text-[#8A8D91] uppercase font-bold tracking-widest mb-2 text-center">Theme Intelligence</p>
+            <p className="text-xs italic text-center text-white/80">
+              "Your brand identity is automatically baked into every generated post using high-performance image processing."
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function SocialPreviewModal({ post, editedContent, editedHashtags, onClose }: any) {
+  const [platform, setPlatform] = useState<"twitter" | "instagram">("twitter");
+  
+  const fullText = (editedContent || "") + " " + (editedHashtags || "");
+  const twitterCharCount = fullText.length;
+  const twitterLimit = 280;
+  const isTwitterOverLimit = twitterCharCount > twitterLimit;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        className="bg-white rounded-[32px] w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col md:flex-row"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Left Side: Preview Controls & Info */}
+        <div className="w-full md:w-80 bg-[#F8F9FA] border-r border-[#E4E6EB] p-8 flex flex-col">
+          <h3 className="font-bold text-xl mb-6">Platform Preview</h3>
+          
+          <div className="flex flex-col gap-2 mb-8">
+            <button 
+              onClick={() => setPlatform("twitter")}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left",
+                platform === "twitter" ? "bg-black text-white" : "hover:bg-[#E4E6EB] text-[#65676B]"
+              )}
+            >
+              Twitter (X)
+            </button>
+            <button 
+              onClick={() => setPlatform("instagram")}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all text-left",
+                platform === "instagram" ? "bg-[#E1306C] text-white" : "hover:bg-[#E4E6EB] text-[#65676B]"
+              )}
+            >
+              Instagram
+            </button>
+          </div>
+
+          <div className="mt-auto space-y-6">
+            {platform === "twitter" ? (
+              <div className="p-4 bg-white rounded-2xl border border-[#E4E6EB]">
+                <p className="text-[10px] font-bold text-[#65676B] uppercase tracking-widest mb-2">Character Limit</p>
+                <div className="flex items-end justify-between">
+                  <span className={cn("text-2xl font-black", isTwitterOverLimit ? "text-red-500" : "text-black")}>
+                    {twitterCharCount}
+                  </span>
+                  <span className="text-sm font-bold text-[#8A8D91]">/ {twitterLimit}</span>
+                </div>
+                <div className="w-full bg-[#F0F2F5] h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div 
+                    className={cn("h-full transition-all", isTwitterOverLimit ? "bg-red-500" : "bg-[#1D9BF0]")} 
+                    style={{ width: `${Math.min((twitterCharCount / twitterLimit) * 100, 100)}%` }}
+                  />
+                </div>
+                {isTwitterOverLimit && (
+                  <p className="text-[10px] text-red-500 font-bold mt-2">Post exceeds character limit!</p>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-white rounded-2xl border border-[#E4E6EB]">
+                <p className="text-[10px] font-bold text-[#65676B] uppercase tracking-widest mb-2">Visual Specs</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">Aspect Ratio</span>
+                    <span className="text-xs font-black text-[#E1306C]">1:1 Square</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-[#F0F2F5] pt-2">
+                    <span className="text-xs font-bold">Safe Zone</span>
+                    <span className="text-xs font-black text-green-500">Optimal</span>
+                  </div>
+                  <p className="text-[10px] text-[#8A8D91] leading-relaxed italic">
+                    Instagram prefers high-contrast square images (1080x1080) for the best grid alignment.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <button 
+              onClick={onClose}
+              className="w-full py-4 bg-[#1C1E21] text-white rounded-xl font-bold hover:bg-black transition-all active:scale-95"
+            >
+              Done Previewing
+            </button>
+          </div>
+        </div>
+
+        {/* Right Side: Visual Mockup */}
+        <div className="flex-grow p-12 bg-[#F0F2F5] flex items-center justify-center min-h-[500px]">
+          {platform === "twitter" ? (
+            <div className="bg-white border border-[#EFF3F4] rounded-2xl w-full max-w-[500px] p-4 flex gap-3 shadow-xl">
+              <div className="w-12 h-12 bg-gray-200 rounded-full flex-shrink-0 flex items-center justify-center font-black text-xs text-[#FF6321]">
+                AS
+              </div>
+              <div className="flex-grow">
+                <div className="flex items-center gap-1 mb-1">
+                  <span className="font-bold text-[15px]">AutoSocial AI</span>
+                  <span className="text-[#536471] text-[15px]">@autosocial · 1m</span>
+                </div>
+                <p className="text-[15px] leading-normal whitespace-pre-wrap mb-3">
+                  {editedContent}
+                  <br />
+                  <span className="text-[#1D9BF0]">{editedHashtags}</span>
+                </p>
+                <div className="rounded-2xl border border-[#EFF3F4] overflow-hidden mb-3">
+                  <img src={post.image_path} alt="Post" className="w-full object-cover aspect-video" referrerPolicy="no-referrer" />
+                </div>
+                <div className="flex justify-between text-[#536471] px-4 max-w-sm">
+                  <Plus size={18} className="hover:text-[#1D9BF0] cursor-pointer transition-colors" />
+                  <RefreshCcw size={18} className="hover:text-green-500 cursor-pointer transition-colors" />
+                  <CheckCircle size={18} className="hover:text-red-500 cursor-pointer transition-colors" />
+                  <Send size={18} className="hover:text-[#1D9BF0] cursor-pointer transition-colors" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-[#DBDBDB] rounded-lg w-full max-w-[400px] overflow-hidden shadow-xl">
+              <div className="p-3 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] p-[2px]">
+                  <div className="w-full h-full bg-white rounded-full p-[1px]">
+                    <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center font-bold text-[10px] text-[#FF6321]">
+                       AS
+                    </div>
+                  </div>
+                </div>
+                <span className="font-bold text-xs">autosocial_ai</span>
+              </div>
+              <img src={post.image_path} alt="Post" className="w-full aspect-square object-cover" referrerPolicy="no-referrer" />
+              <div className="p-4">
+                <div className="flex gap-4 mb-3">
+                  <Plus size={24} className="hover:opacity-60 cursor-pointer transition-opacity" />
+                  <RefreshCcw size={24} className="hover:opacity-60 cursor-pointer transition-opacity" />
+                  <Send size={24} className="hover:opacity-60 cursor-pointer transition-opacity" />
+                </div>
+                <p className="text-sm font-bold mb-1">0 likes</p>
+                <p className="text-sm">
+                  <span className="font-bold mr-2">autosocial_ai</span>
+                  {editedContent}
+                </p>
+                <p className="text-[#00376B] text-sm">{editedHashtags}</p>
+                <p className="text-[#8E8E8E] text-[10px] uppercase mt-2 font-medium">Just Now</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

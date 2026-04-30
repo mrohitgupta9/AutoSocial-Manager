@@ -9,31 +9,31 @@ const dbPath = path.join(process.cwd(), "data.db");
 export const db = new Database(dbPath);
 
 export function initDatabase() {
-  // Users for authentication
+  // Global branding settings
   db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      name TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    CREATE TABLE IF NOT EXISTS branding_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      logo_path TEXT,
+      branding_theme TEXT DEFAULT 'modern'
     )
   `);
+
+  // Initialize default branding if not exists
+  const existingBranding = db.prepare("SELECT * FROM branding_settings WHERE id = 1").get();
+  if (!existingBranding) {
+    db.prepare("INSERT INTO branding_settings (id, branding_theme) VALUES (1, 'modern')").run();
+  }
 
   // Secure storage for platform API credentials
   db.exec(`
     CREATE TABLE IF NOT EXISTS api_credentials (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      platform TEXT NOT NULL, -- twitter, instagram, linkedin
+      platform TEXT PRIMARY KEY, -- twitter, instagram, linkedin
       api_key TEXT,
       api_secret TEXT,
       access_token TEXT,
       refresh_token TEXT,
       expires_at DATETIME,
-      status TEXT DEFAULT 'active',
-      FOREIGN KEY(user_id) REFERENCES users(id),
-      UNIQUE(user_id, platform)
+      status TEXT DEFAULT 'active'
     )
   `);
 

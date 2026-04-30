@@ -1,65 +1,65 @@
 import axios from "axios";
 
-// Helper to get token from storage
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 export class ApiService {
-  static async register(data: any) {
-    return (await axios.post("/api/auth/register", data)).data;
-  }
-
-  static async login(data: any) {
-    const res = await axios.post("/api/auth/login", data);
-    if (res.data.token) {
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
-    }
-    return res.data;
-  }
-
-  static logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-  }
-
   static async getTopics() {
-    return (await axios.get("/api/topics", { headers: getAuthHeaders() })).data;
+    return (await axios.get("/api/topics")).data;
   }
 
   static async refreshTopics() {
-    return (await axios.post("/api/topics/refresh", {}, { headers: getAuthHeaders() })).data;
+    return (await axios.post("/api/topics/refresh", {})).data;
   }
 
   static async getPosts() {
-    return (await axios.get("/api/posts", { headers: getAuthHeaders() })).data;
+    return (await axios.get("/api/posts")).data;
   }
 
-  static async generateImage(topicId: string, content: any) {
+  static async generatePost(topicId: string, caption: string, hashtags: string) {
     return (await axios.post("/api/posts/generate", { 
       topic_id: topicId,
-      content: content.caption,
-      hashtags: content.hashtags.join(" ")
-    }, { headers: getAuthHeaders() })).data;
+      caption: caption,
+      hashtags: hashtags
+    })).data;
   }
 
   static async schedulePost(postId: string, scheduledAt: string) {
-    return (await axios.post(`/api/posts/${postId}/schedule`, { scheduled_at: scheduledAt }, { headers: getAuthHeaders() })).data;
+    return (await axios.post(`/api/posts/${postId}/schedule`, { scheduled_at: scheduledAt })).data;
+  }
+
+  static async updatePost(postId: string, data: { content: string, hashtags: string }) {
+    return (await axios.patch(`/api/posts/${postId}`, data)).data;
+  }
+
+  static async deletePost(postId: string) {
+    return (await axios.delete(`/api/posts/${postId}`)).data;
+  }
+  
+  static async getBranding() {
+    return (await axios.get("/api/user/branding")).data;
+  }
+  
+  static async updateBranding(data: { branding_theme: string }) {
+    return (await axios.patch("/api/user/branding", data)).data;
+  }
+  
+  static async uploadLogo(file: File) {
+    const formData = new FormData();
+    formData.append("logo", file);
+    return (await axios.post("/api/user/logo", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data"
+      }
+    })).data;
   }
 
   static async getAnalytics() {
-    return (await axios.get("/api/analytics", { headers: getAuthHeaders() })).data;
+    return (await axios.get("/api/analytics")).data;
   }
 
   static async getCredentials() {
-    return (await axios.get("/api/credentials", { headers: getAuthHeaders() })).data;
+    return (await axios.get("/api/credentials")).data;
   }
 
   static async saveCredentials(data: any) {
-    return (await axios.post("/api/credentials", data, { headers: getAuthHeaders() })).data;
+    return (await axios.post("/api/credentials", data)).data;
   }
 }
-// We also need a ContentService on the backend that handles the image generation call
-// Actually, I already put that logic in /api/posts/generate

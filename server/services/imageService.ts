@@ -2,8 +2,13 @@ import sharp from "sharp";
 import path from "path";
 import fs from "fs";
 
+export interface BrandingInfo {
+  logoPath?: string;
+  theme?: string;
+}
+
 export class ImageService {
-  static async createSocialImage(text: string, outputPath: string) {
+  static async createSocialImage(text: string, outputPath: string, branding: BrandingInfo = {}) {
     const fullOutputPath = path.join(process.cwd(), outputPath);
     const dir = path.dirname(fullOutputPath);
     
@@ -11,10 +16,33 @@ export class ImageService {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // Creating a beautiful background image with text overlay using sharp
-    // We'll create an SVG and render it to PNG
+    const { theme = 'modern', logoPath } = branding;
+    
     const width = 1080;
     const height = 1080;
+    
+    // Theme colors
+    let bgColor = 'url(#grad)';
+    let textColor = 'white';
+    let gradientStops = `
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FF3F00;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D00000;stop-opacity:1" />
+    `;
+
+    if (theme === 'minimal') {
+      bgColor = '#F8F9FA';
+      textColor = '#1C1E21';
+      gradientStops = ''; // Not used
+    } else if (theme === 'brutalist') {
+      bgColor = '#FFE000';
+      textColor = '#000000';
+    } else if (theme === 'bold') {
+      gradientStops = `
+        <stop offset="0%" style="stop-color:#6228d7;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#ee2a7b;stop-opacity:1" />
+      `;
+    }
     
     // Split text for better layout
     const words = text.split(" ");
@@ -29,10 +57,10 @@ export class ImageService {
       }
     });
     lines.push(currentLine);
-    lines = lines.slice(0, 5); // Max 5 lines
+    lines = lines.slice(0, 5);
 
     const textSvg = lines.map((line, i) => `
-      <text x="50%" y="${450 + (i * 80)}" text-anchor="middle" font-family="sans-serif" font-size="64" font-weight="bold" fill="white">
+      <text x="50%" y="${450 + (i * 80)}" text-anchor="middle" font-family="sans-serif" font-size="64" font-weight="900" fill="${textColor}">
         ${this.escapeXml(line)}
       </text>
     `).join("");
@@ -41,25 +69,55 @@ export class ImageService {
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#FF6321;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#FF4E00;stop-opacity:1" />
+            ${gradientStops}
           </linearGradient>
+          <filter id="shadow" x="0" y="0" width="200%" height="200%">
+            <feOffset result="offOut" in="SourceAlpha" dx="0" dy="4" />
+            <feGaussianBlur result="blurOut" in="offOut" stdDeviation="15" />
+            <feBlend in="SourceGraphic" in2="blurOut" mode="normal" />
+          </filter>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grad)" />
-        <rect x="50" y="50" width="980" height="980" fill="none" stroke="white" stroke-width="2" stroke-opacity="0.2" />
-        <text x="50%" y="200" text-anchor="middle" font-family="sans-serif" font-size="24" font-weight="600" fill="white" opacity="0.8" style="text-transform: uppercase; letter-spacing: 4px;">
-          TRENDING NOW
-        </text>
-        ${textSvg}
-        <text x="50%" y="950" text-anchor="middle" font-family="sans-serif" font-size="20" fill="white" opacity="0.6">
-          Powered by AutoSocial Manager
+        
+        <!-- Background -->
+        <rect width="100%" height="100%" fill="${bgColor}" />
+        
+        ${theme !== 'minimal' ? `
+        <!-- Border Decor -->
+        <rect x="40" y="40" width="1000" height="1000" fill="none" stroke="${textColor}" stroke-width="1" stroke-opacity="0.15" />
+        <rect x="60" y="60" width="960" height="960" fill="none" stroke="${textColor}" stroke-width="3" stroke-opacity="0.3" />
+        ` : ''}
+        
+        <!-- Top Branded Label -->
+        <g opacity="0.9">
+          <text x="50%" y="176" text-anchor="middle" font-family="sans-serif" font-size="20" font-weight="900" fill="${textColor}" style="text-transform: uppercase; letter-spacing: 5px;">
+            TRENDING
+          </text>
+        </g>
+        
+        <!-- News Title -->
+        <g filter="${theme === 'brutalist' ? '' : 'url(#shadow)'}">
+          ${textSvg}
+        </g>
+        
+        <!-- Bottom Branding -->
+        <text x="50%" y="950" text-anchor="middle" font-family="sans-serif" font-size="28" font-weight="900" fill="${textColor}" style="letter-spacing: 2px;">
+          AUTOSOCIAL <tspan fill-opacity="0.6" font-weight="400">|</tspan> PRO
         </text>
       </svg>
     `;
 
-    await sharp(Buffer.from(svgImage))
-      .png()
-      .toFile(fullOutputPath);
+    let image = sharp(Buffer.from(svgImage));
+    
+    // Add logo overlay if exists
+    if (logoPath) {
+      const actualLogoPath = path.join(process.cwd(), "data", logoPath.replace(/^\//, ''));
+      if (fs.existsSync(actualLogoPath)) {
+        const logoBuffer = await sharp(actualLogoPath).resize(150, 150, { fit: 'inside' }).toBuffer();
+        image = image.composite([{ input: logoBuffer, top: 100, left: 465 }]);
+      }
+    }
+
+    await image.png().toFile(fullOutputPath);
     
     return outputPath;
   }
