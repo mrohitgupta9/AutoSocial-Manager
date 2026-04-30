@@ -1,0 +1,6 @@
+{
+  "name": "AutoSocial Manager",
+  "description": "An automated social media content engine that fetches trending news, generates AI-powered captions, creates branded images, and schedules posts to Twitter and Instagram.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
