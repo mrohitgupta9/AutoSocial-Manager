@@ -24,6 +24,16 @@ export function initDatabase() {
     db.prepare("INSERT INTO branding_settings (id, branding_theme) VALUES (1, 'modern')").run();
   }
 
+  // Migration: Drop old tables if they have the old schema (containing user_id)
+  const postsInfo = db.prepare("PRAGMA table_info(posts)").all() as any[];
+  if (postsInfo.some(col => col.name === 'user_id')) {
+    console.log("Migrating database: Dropping old tables to match new auth-less schema");
+    db.exec("DROP TABLE IF EXISTS analytics");
+    db.exec("DROP TABLE IF EXISTS posts");
+    db.exec("DROP TABLE IF EXISTS api_credentials");
+    db.exec("DROP TABLE IF EXISTS users");
+  }
+
   // Secure storage for platform API credentials
   db.exec(`
     CREATE TABLE IF NOT EXISTS api_credentials (

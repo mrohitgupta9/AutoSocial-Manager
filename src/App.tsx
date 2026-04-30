@@ -5,6 +5,7 @@ import { GeminiService } from "./services/geminiService";
 import { motion, AnimatePresence } from "motion/react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -194,38 +195,110 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="bg-white rounded-2xl border border-[#E4E6EB] overflow-hidden"
+              className="space-y-8"
             >
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#F8F9FA] border-bottom border-[#E4E6EB]">
-                    <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Content Preview</th>
-                    <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Reach</th>
-                    <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Engagement</th>
-                    <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analytics.map((stat, i) => (
-                    <tr key={i} className="border-b border-[#F0F2F5] hover:bg-[#F8F9FA] transition-colors">
-                      <td className="p-6">
-                        <p className="font-medium text-sm line-clamp-1 max-w-xs">{stat.content}</p>
-                      </td>
-                      <td className="p-6 font-mono font-bold text-[#FF6321]">{stat.reach.toLocaleString()}</td>
-                      <td className="p-6">
-                        <div className="flex gap-4 text-sm font-medium">
-                          <span className="flex items-center gap-1.5"><CheckCircle size={14} className="text-green-500" /> {stat.likes} likes</span>
-                          <span className="flex items-center gap-1.5"><RefreshCcw size={14} className="text-blue-500" /> {stat.shares} shares</span>
-                        </div>
-                      </td>
-                      <td className="p-6">
-                         <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">Active</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {analytics.length === 0 && <div className="p-20 text-center text-[#65676B]">Performance data will appear after your first post.</div>}
+              {analytics.length > 0 && (
+                <div className="bg-white p-8 rounded-3xl border border-[#E4E6EB] shadow-sm">
+                  <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                    <BarChart3 size={20} className="text-[#FF6321]" />
+                    Engagement Metrics Overview
+                  </h3>
+                  <div className="h-[400px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={analytics}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F2F5" />
+                        <XAxis 
+                          dataKey="content" 
+                          angle={-15} 
+                          textAnchor="end" 
+                          interval={0} 
+                          height={70} 
+                          tick={{ fontSize: 10, fill: '#65676B', fontWeight: 600 }}
+                          tickFormatter={(val) => val.length > 20 ? val.substring(0, 20) + '...' : val}
+                        />
+                        <YAxis tick={{ fontSize: 12, fill: '#65676B' }} />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                        <Bar 
+                          name="Reach" 
+                          dataKey="reach" 
+                          fill="#FF6321" 
+                          radius={[6, 6, 0, 0]} 
+                          barSize={40} 
+                        />
+                        <Bar 
+                          name="Likes" 
+                          dataKey="likes" 
+                          fill="#6228d7" 
+                          radius={[6, 6, 0, 0]} 
+                          barSize={40} 
+                        />
+                        <Bar 
+                          name="Shares" 
+                          dataKey="shares" 
+                          fill="#ee2a7b" 
+                          radius={[6, 6, 0, 0]} 
+                          barSize={40} 
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-3xl border border-[#E4E6EB] overflow-hidden shadow-sm">
+                <div className="p-6 border-b border-[#F0F2F5] flex justify-between items-center">
+                   <h3 className="font-bold text-lg">Detailed Analytics</h3>
+                   <span className="text-[10px] font-black uppercase tracking-widest text-[#8A8D91]">Real-time Tracking</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-[#F8F9FA] border-b border-[#E4E6EB]">
+                        <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Content Preview</th>
+                        <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Reach</th>
+                        <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Engagement</th>
+                        <th className="p-6 text-[10px] font-bold text-[#65676B] uppercase tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.map((stat, i) => (
+                        <tr key={i} className="border-b border-[#F0F2F5] hover:bg-[#F8F9FA] transition-colors group">
+                          <td className="p-6">
+                            <p className="font-bold text-sm line-clamp-1 max-w-xs group-hover:text-[#FF6321] transition-colors">{stat.content}</p>
+                          </td>
+                          <td className="p-6 font-mono font-black text-[#FF6321]">{stat.reach.toLocaleString()}</td>
+                          <td className="p-6">
+                            <div className="flex gap-4 text-xs font-bold font-mono">
+                              <span className="flex items-center gap-1.5 text-[#6228d7] bg-[#6228d7]/10 px-2 py-1 rounded-lg">
+                                <CheckCircle size={14} /> {stat.likes}
+                              </span>
+                              <span className="flex items-center gap-1.5 text-[#ee2a7b] bg-[#ee2a7b]/10 px-2 py-1 rounded-lg">
+                                <RefreshCcw size={14} /> {stat.shares}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-6">
+                             <span className="bg-green-500 text-white text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-wider shadow-sm shadow-green-500/20">Active</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {analytics.length === 0 && (
+                  <div className="p-32 text-center">
+                    <BarChart3 size={48} className="mx-auto mb-4 text-[#E4E6EB]" />
+                    <p className="text-[#65676B] font-bold">Performance data will appear after your first post is active.</p>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
@@ -491,13 +564,24 @@ function PostCard({ post, onRefresh }: any) {
             <div className="relative group">
               <textarea
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl border-2 border-[#FF6321] text-sm focus:ring-4 focus:ring-[#FF6321]/10 outline-none min-h-[120px] resize-none shadow-sm transition-all"
+                className={cn(
+                  "w-full px-4 py-3 rounded-xl border-2 text-sm focus:ring-4 outline-none min-h-[120px] resize-none shadow-sm transition-all",
+                  [editedContent, editedHashtags].filter(Boolean).join("\n").length > 280 ? "border-red-500 focus:ring-red-500/10 shadow-red-500/5 shadow-inner" : "border-[#FF6321] focus:ring-[#FF6321]/10"
+                )}
                 value={editedContent}
                 onChange={(e) => setEditedContent(e.target.value)}
                 placeholder="Write your caption here..."
               />
-              <div className="absolute bottom-2 right-2 text-[10px] font-bold text-[#8A8D91] bg-white/80 px-2 py-1 rounded">
-                Caption
+              <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                <span className={cn(
+                  "text-[10px] font-black px-2 py-1 rounded",
+                  [editedContent, editedHashtags].filter(Boolean).join("\n").length > 280 ? "bg-red-500 text-white" : "bg-white/80 text-[#8A8D91]"
+                )}>
+                  {[editedContent, editedHashtags].filter(Boolean).join("\n").length} / 280
+                </span>
+                <div className="text-[10px] font-bold text-[#8A8D91] bg-white/80 px-2 py-1 rounded">
+                  Caption
+                </div>
               </div>
             </div>
             <div className="relative">
@@ -749,7 +833,7 @@ function BrandingView({ branding, onRefresh }: any) {
 function SocialPreviewModal({ post, editedContent, editedHashtags, onClose }: any) {
   const [platform, setPlatform] = useState<"twitter" | "instagram">("twitter");
   
-  const fullText = (editedContent || "") + " " + (editedHashtags || "");
+  const fullText = [editedContent, editedHashtags].filter(Boolean).join("\n");
   const twitterCharCount = fullText.length;
   const twitterLimit = 280;
   const isTwitterOverLimit = twitterCharCount > twitterLimit;
@@ -766,7 +850,10 @@ function SocialPreviewModal({ post, editedContent, editedHashtags, onClose }: an
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        className="bg-white rounded-[32px] w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col md:flex-row"
+        className={cn(
+          "bg-white rounded-[32px] w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col md:flex-row transition-all duration-500",
+          isTwitterOverLimit && platform === "twitter" ? "ring-8 ring-red-500/20" : ""
+        )}
         onClick={e => e.stopPropagation()}
       >
         {/* Left Side: Preview Controls & Info */}
@@ -796,22 +883,42 @@ function SocialPreviewModal({ post, editedContent, editedHashtags, onClose }: an
 
           <div className="mt-auto space-y-6">
             {platform === "twitter" ? (
-              <div className="p-4 bg-white rounded-2xl border border-[#E4E6EB]">
-                <p className="text-[10px] font-bold text-[#65676B] uppercase tracking-widest mb-2">Character Limit</p>
+              <div className={cn(
+                "p-5 bg-white rounded-2xl border-2 transition-all shadow-sm",
+                isTwitterOverLimit ? "border-red-500 bg-red-50" : "border-[#E4E6EB]"
+              )}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className={cn(
+                    "text-[10px] font-black uppercase tracking-widest",
+                    isTwitterOverLimit ? "text-red-600" : "text-[#65676B]"
+                  )}>Character Limit</p>
+                  {isTwitterOverLimit && (
+                    <motion.div 
+                      animate={{ scale: [1, 1.2, 1] }} 
+                      transition={{ repeat: Infinity, duration: 1 }}
+                      className="w-2.5 h-2.5 rounded-full bg-red-500" 
+                    />
+                  )}
+                </div>
                 <div className="flex items-end justify-between">
-                  <span className={cn("text-2xl font-black", isTwitterOverLimit ? "text-red-500" : "text-black")}>
+                  <span className={cn("text-3xl font-black", isTwitterOverLimit ? "text-red-600" : "text-black")}>
                     {twitterCharCount}
                   </span>
                   <span className="text-sm font-bold text-[#8A8D91]">/ {twitterLimit}</span>
                 </div>
-                <div className="w-full bg-[#F0F2F5] h-1.5 rounded-full mt-3 overflow-hidden">
+                <div className="w-full bg-[#F0F2F5] h-2 rounded-full mt-4 overflow-hidden">
                   <div 
-                    className={cn("h-full transition-all", isTwitterOverLimit ? "bg-red-500" : "bg-[#1D9BF0]")} 
+                    className={cn("h-full transition-all duration-500", isTwitterOverLimit ? "bg-red-500" : "bg-[#1D9BF0]")} 
                     style={{ width: `${Math.min((twitterCharCount / twitterLimit) * 100, 100)}%` }}
                   />
                 </div>
                 {isTwitterOverLimit && (
-                  <p className="text-[10px] text-red-500 font-bold mt-2">Post exceeds character limit!</p>
+                  <div className="flex flex-col gap-1 mt-4">
+                    <p className="text-[10px] text-red-600 font-black uppercase tracking-tight flex items-center gap-1">
+                      ⚠️ Limit Exceeded
+                    </p>
+                    <p className="text-[9px] text-red-500 font-medium">Please shorten your post for Twitter (X).</p>
+                  </div>
                 )}
               </div>
             ) : (

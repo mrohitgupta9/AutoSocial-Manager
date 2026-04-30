@@ -6,10 +6,9 @@ export class PostingService {
     const post = db.prepare("SELECT * FROM posts WHERE id = ?").get(postId) as any;
     if (!post) throw new Error("Post not found");
 
-    const userId = post.user_id;
-    const credentials = db.prepare("SELECT * FROM api_credentials WHERE user_id = ?").all(userId) as any[];
+    console.log(`[PostingService] Processing post ${postId}`);
 
-    console.log(`[PostingService] Processing post ${postId} for user ${userId}`);
+    const credentials = db.prepare("SELECT * FROM api_credentials").all() as any[];
 
     // Filter relevant platforms
     const platforms = post.platform === "both" ? ["Twitter (X)", "Instagram"] : [post.platform];

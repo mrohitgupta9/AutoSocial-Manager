@@ -44,23 +44,47 @@ export class ImageService {
       `;
     }
     
+    // Dynamic Font size calculation based on text length
+    const charCount = text.length;
+    let fontSize = 72;
+    let lineGap = 90;
+    let maxCharsPerLine = 20;
+
+    if (charCount > 150) {
+      fontSize = 36;
+      lineGap = 45;
+      maxCharsPerLine = 40;
+    } else if (charCount > 100) {
+      fontSize = 48;
+      lineGap = 60;
+      maxCharsPerLine = 32;
+    } else if (charCount > 60) {
+      fontSize = 60;
+      lineGap = 75;
+      maxCharsPerLine = 24;
+    }
+    
     // Split text for better layout
     const words = text.split(" ");
     let lines: string[] = [];
     let currentLine = "";
     words.forEach(word => {
-      if ((currentLine + word).length > 25) {
-        lines.push(currentLine);
+      if ((currentLine + word).length > maxCharsPerLine) {
+        if (currentLine) lines.push(currentLine.trim());
         currentLine = word + " ";
       } else {
         currentLine += word + " ";
       }
     });
-    lines.push(currentLine);
-    lines = lines.slice(0, 5);
+    if (currentLine) lines.push(currentLine.trim());
+    lines = lines.slice(0, 8); // Allow more lines for smaller text
+
+    // Center vertical position
+    const totalHeight = lines.length * lineGap;
+    const startY = (height / 2) - (totalHeight / 2) + (fontSize / 2);
 
     const textSvg = lines.map((line, i) => `
-      <text x="50%" y="${450 + (i * 80)}" text-anchor="middle" font-family="sans-serif" font-size="64" font-weight="900" fill="${textColor}">
+      <text x="50%" y="${startY + (i * lineGap)}" text-anchor="middle" font-family="sans-serif" font-size="${fontSize}" font-weight="900" fill="${textColor}">
         ${this.escapeXml(line)}
       </text>
     `).join("");
@@ -71,10 +95,16 @@ export class ImageService {
           <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
             ${gradientStops}
           </linearGradient>
-          <filter id="shadow" x="0" y="0" width="200%" height="200%">
-            <feOffset result="offOut" in="SourceAlpha" dx="0" dy="4" />
-            <feGaussianBlur result="blurOut" in="offOut" stdDeviation="15" />
-            <feBlend in="SourceGraphic" in2="blurOut" mode="normal" />
+          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="blur" />
+            <feOffset in="blur" dx="0" dy="10" result="offsetBlur" />
+            <feComponentTransfer in="offsetBlur" result="shadowOpacity">
+               <feFuncA type="linear" slope="0.4"/>
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode in="shadowOpacity" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
         </defs>
         

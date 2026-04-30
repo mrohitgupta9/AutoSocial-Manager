@@ -3,6 +3,7 @@ import { db } from "./db.ts";
 import { NewsService } from "./services/newsService.ts";
 import { ImageService } from "./services/imageService.ts";
 import { encrypt, maskToken } from "./utils/crypto.ts";
+import crypto from "node:crypto";
 import multer from "multer";
 import fs from "fs";
 
